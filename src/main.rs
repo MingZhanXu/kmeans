@@ -216,25 +216,24 @@ fn kmeans(
         let mut team_flag: usize = 0;
         let mut k_num_list: Vec<Vec<usize>> = Vec::new();
         let mut k_num_flag: usize = 0;
+        let mut k_num_max: usize = 0;
         let mut last_k_num: Vec<usize> = Vec::new();
         let mut point_flag = false;
         let mut user_list: Vec<usize> = Vec::new();
         let mut user_list_flag: usize = 0;
         let mut max_user: usize = 0;
-        
+
         let mut step_now = 0;
         let start_time: Instant = Instant::now();
         let mut user_id: TaskUser = TaskUser {
             code_name: 0,
             num: 0,
         };
-        
-        for _i in 0..seed_num {
-            k_num_list.push(Vec::new());
-        }
-        for _i in 0..max {
-            team_list.push(Vec::new());
-        }
+        // if num == TASK_PUBLLISHER{
+        //     max_user = max;
+        //     k_num_list.resize(seed_num, Vec::new());
+        //     team_list.resize(max, Vec::new());
+        // }
         loop {
             if let Ok((size, _addr)) = socket_get.recv_from(&mut buf) {
                 let msg_type: MessageType =
@@ -243,18 +242,24 @@ fn kmeans(
                     //接收到任務
                     MessageType::TaskNameMessage(get_task, get_max) => {
                         println!("get task:{}, max:{}", get_task, get_max);
-                        max_user = get_max;
                         user_list = vec![0; max_user];
+                        println!("num: {}", num);
                         match num{
                             TASK_PUBLLISHER => {
+                                println!("發布者");
+                                max_user = max;
+                                user_list.resize(max_user,1);
+                                k_num_list.resize(seed_num, Vec::new());
+                                team_list.resize(max_user, Vec::new());
                                 let msg_type = MessageType::CodeNameMessage(user_id.code_name);
                                 send_message(&socket_send, msg_type);
                             }
                             _ => {
-                                user_id = TaskUser {
-                                    code_name: 0,
-                                    num: 0,
-                                };
+                                println!("接取者");
+                                max_user = get_max;
+                                user_list.resize(max_user,1);
+                                team_list.resize(max_user, Vec::new());
+                                user_id.code_name = rand::thread_rng().gen_range(2..std::usize::MAX as usize);
                                 let msg_type = MessageType::CodeNameMessage(user_id.code_name);
                                 send_message(&socket_send, msg_type);
                             }
@@ -272,7 +277,7 @@ fn kmeans(
                                             code_name: get_code_name,
                                             num: user_list_flag,
                                         },
-                                        max - user_list_flag - 1,
+                                        max_user - user_list_flag - 1,
                                     );
                                     send_message(&socket_send, msg_type);
                                     user_list_flag += 1;
@@ -282,7 +287,7 @@ fn kmeans(
                                         send_message(&socket_send, msg_type);
                                     }
                                 } else {
-                                    println!("Warning: User capacity reached. --CodeNameMessage");
+                                    println!("Warning: User capacity reached. --CodeNameMessage\n\tuser_list_flag:{}\t\tmax_user:{}", user_list_flag, max_user);
                                 }
                             }
                             //其餘
@@ -296,7 +301,7 @@ fn kmeans(
                         }
                         user_list[get_task_user.num] = get_task_user.code_name;
                     }
-                    //初始化Point
+                    //Point
                     MessageType::PointMessage(points) => {
                         println!("reset point step_now:{}", step_now);
                         if point_flag == false {
@@ -321,8 +326,10 @@ fn kmeans(
                             let mut k_num = thread_k_num.lock().unwrap();
                             *k_num = get_k_num.clone();
                             last_k_num = k_num.clone();
+                            k_num_max = k_num.len();
+                            k_num_list.resize(k_num_max, Vec::new());
                             let point = thread_point.lock().unwrap();
-                            team_list[num] = cluster(&point, &k_num, num, max); //計算team
+                            team_list[num] = cluster(&point, &k_num, num, max_user); //計算team
                             step_now += 1;
                             let msg_type =
                                 MessageType::TeamMessage((step_now, num, team_list[num].clone())); //發送team
@@ -331,26 +338,27 @@ fn kmeans(
                             println!("無法接收k_num，需等到處理完畢");
                         }
                     }
+                    //群資料
                     MessageType::TeamMessage((get_step, get_num, get_team)) => {
                         println!("received team step_now:{}", step_now);
-                        if point_flag == true && get_step == step_now && team_flag < max {
+                        if point_flag == true && get_step == step_now && team_flag < max_user {
                             team_list[get_num] = get_team.clone();
                             team_flag += 1;
-                            if team_flag == max {
+                            if team_flag == max_user {
                                 team_flag = 0;
                                 let mut team = thread_team.lock().unwrap();
                                 let point = thread_point.lock().unwrap();
                                 team.clear();
-                                for _i in 0..seed_num {
+                                for _i in 0..k_num_max {
                                     team.push(Vec::new());
                                 }
-                                for i in 0..max {
-                                    for j in 0..seed_num {
+                                for i in 0..max_user {
+                                    for j in 0..k_num_max {
                                         team[j].extend(&team_list[i][j]);
                                     }
                                 }
                                 //計算並發送k_num
-                                k_num_list[num] = re_seed(&point, &team, num, max);
+                                k_num_list[num] = re_seed(&point, &team, num, max_user);
                                 step_now += 1;
                                 k_num_flag = 0;
                                 let msg_type = MessageType::KNumMessage((
@@ -364,18 +372,21 @@ fn kmeans(
                             println!("Please input point. --get_team");
                         }
                     }
+                    //中心點
                     MessageType::KNumMessage((get_step, get_num, get_k_num)) => {
                         println!("received k_num step_now:{}", step_now);
-                        if point_flag == true && get_step == step_now && k_num_flag < max {
+                        if point_flag == true && get_step == step_now && k_num_flag < max_user {
                             k_num_list[get_num] = get_k_num.clone();
                             k_num_flag += 1;
-                            if k_num_flag == max {
+                            println!("{} {}", k_num_flag, k_num_max);
+                            if k_num_flag == max_user {
                                 k_num_flag = 0;
                                 let mut k_num = thread_k_num.lock().unwrap();
                                 k_num.clear();
                                 for i in &k_num_list {
                                     k_num.extend(i);
                                 }
+                                println!("{:?}", k_num);
                                 if *k_num == last_k_num {
                                     let end_time: Instant = Instant::now();
                                     let elapsed_time = end_time - start_time;
@@ -384,7 +395,7 @@ fn kmeans(
                                 }
                                 last_k_num = k_num.clone();
                                 let point = thread_point.lock().unwrap();
-                                team_list[num] = cluster(&point, &k_num, num, max); //計算team
+                                team_list[num] = cluster(&point, &k_num, num, max_user); //計算team
                                 step_now += 1;
                                 let msg_type = MessageType::TeamMessage((
                                     step_now,
@@ -395,7 +406,7 @@ fn kmeans(
                             }
                         } else {
                             println!("Please input point. --get_k_num");
-                            println!("{} {}", k_num_flag, max);
+                            println!("{} {}", k_num_flag, k_num_max);
                         }
                     }
                 }
@@ -408,13 +419,12 @@ fn kmeans(
         let socket = UdpSocket::bind("0.0.0.0:0").expect("Failed to bind socket");
         let task = rand::thread_rng().gen_range(0..std::usize::MAX as usize);
         let msg_type = MessageType::TaskNameMessage(task.to_string(), max); //產生隨機點
-        let serialized_msg = serde_json::to_string(&msg_type).expect("Failed to serialize message");
         // for i in serialized_msg.chars(){
         //     socket.send_to(i.to_string().as_bytes(), "127.0.0.1:8888").expect("Failed to send message");
         // }
-        socket
-            .send_to(serialized_msg.as_bytes(), "127.0.0.1:8888")
-            .expect("Failed to send message");
+        send_message(&socket, msg_type);
+        thread::sleep(Duration::from_secs(1));
+
     }
 
     handle.join().unwrap();
@@ -468,5 +478,8 @@ fn send_message(socket_send: &UdpSocket, msg_type: MessageType) {
     let serialized_msg = serde_json::to_string(&msg_type).expect("Failed to serialize message");
     socket_send
         .send_to(serialized_msg.as_bytes(), "127.0.0.1:8888")
+        .expect("Failed to send message");
+    socket_send
+        .send_to(serialized_msg.as_bytes(), "127.0.0.1:8889")
         .expect("Failed to send message");
 }
