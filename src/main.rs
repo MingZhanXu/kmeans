@@ -27,8 +27,9 @@ fn main() {
             let dot_num = read_number("dot_num: ");
             let draw_state = read_number("draw_state (0 false): ");
             let (k_num, team, point) = kmeans(seed_num, num, max, dot_num);
+            println!("output:\nteam:{:?}\nk_num:{:?}", team, k_num);
             if draw_state != 0 {
-                draw_window(seed_num, &point, &team, &k_num);
+                draw_window(&point, &team, &k_num);
             }
         }
         _ => {
@@ -119,14 +120,13 @@ fn cluster(point: &Vec<Point>, k_num: &Vec<usize>, num: usize, max: usize) -> Ve
     if num == max - 1 {
         dot_range = dot_num - start;
     }
-    let point_t = &point[start..start + dot_range];
     let seed_num = k_num.len();
     let mut team: Vec<Vec<usize>> = vec![vec![]; seed_num];
-    for i in 0..dot_range {
+    for i in start..start + dot_range {
         let mut mid_dis = f64::MAX;
         let mut flag: usize = 0;
         for j in 0..seed_num {
-            let distant = point_t[i].dis(&point[k_num[j]]);
+            let distant = point[i].dis(&point[k_num[j]]);
             if distant < mid_dis {
                 mid_dis = distant;
                 flag = j;
@@ -292,6 +292,7 @@ fn kmeans(
                     MessageType::NumMessage(get_task_user, get_user_t) => {
                         if get_task_user.code_name == user_id.code_name && get_user_t < max_user {
                             user_id.num = get_task_user.num;
+                            println!("user_id.num:{} --NumMessage", user_id.num);
                         }
                         user_list[get_task_user.num] = get_task_user.code_name;
                     }
@@ -337,6 +338,7 @@ fn kmeans(
                         println!("received team step_now:{}", step_now);
                         if point_flag == true && get_step == step_now && team_flag < max_user {
                             team_list[get_num] = get_team.clone();
+                            println!("get_num:{}\nget_team:{:?}", get_num, get_team.clone());
                             team_flag += 1;
                             if team_flag == max_user {
                                 team_flag = 0;
@@ -348,9 +350,11 @@ fn kmeans(
                                 }
                                 for i in 0..max_user {
                                     for j in 0..seed_num {
+                                        //j會超出
                                         team[j].extend(&team_list[i][j]);
                                     }
                                 }
+                                println!("team:\n{:?}", team);
                                 //計算並發送k_num
                                 k_num_list[user_id.num] = re_seed(&point, &team, user_id.num, max_user);
                                 step_now += 1;
@@ -380,7 +384,7 @@ fn kmeans(
                                 for i in &k_num_list {
                                     k_num.extend(i);
                                 }
-                                println!("{:?}", k_num);
+                                println!("knum:\n{:?}", k_num);
                                 if *k_num == last_k_num {
                                     let end_time: Instant = Instant::now();
                                     let elapsed_time = end_time - start_time;
@@ -429,7 +433,8 @@ fn kmeans(
     (k_nums.clone(), teams.clone(), out_point.clone())
 }
 //繪製視窗
-fn draw_window(seed_num: usize, point: &Vec<Point>, team: &Vec<Vec<usize>>, k_num: &Vec<usize>) {
+fn draw_window(point: &Vec<Point>, team: &Vec<Vec<usize>>, k_num: &Vec<usize>) {
+    println!("draw:\nteam:{:?}\nk_num:{:?}", team, k_num);
     //繪圖
     let mut window: PistonWindow = WindowSettings::new("kmean", [1024, 1024])
         .exit_on_esc(true)
@@ -438,9 +443,10 @@ fn draw_window(seed_num: usize, point: &Vec<Point>, team: &Vec<Vec<usize>>, k_nu
     while let Some(event) = window.next() {
         window.draw_2d(&event, |c, g, _| {
             clear([1.0; 4], g);
-            for i in 0..seed_num {
+            for i in 0..k_num.len() {
                 let line_color = [0.0, 0.0, 0.0, 1.0];
                 for j in &team[i] {
+                    print!("{} ", *j);
                     line(
                         line_color,
                         1.0,
@@ -454,6 +460,7 @@ fn draw_window(seed_num: usize, point: &Vec<Point>, team: &Vec<Vec<usize>>, k_nu
                         g,
                     );
                 }
+                println!();
             }
         });
     }
