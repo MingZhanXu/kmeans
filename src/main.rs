@@ -179,7 +179,7 @@ fn re_seed(point: &Vec<Point>, team: &Vec<Vec<usize>>, num: usize, max: usize) -
 }
 //執行kmeans
 fn kmeans(
-    seed_num: usize,
+    seed_num_temp: usize,
     num: usize,
     max: usize,
     dot_num: usize,
@@ -216,7 +216,7 @@ fn kmeans(
         let mut team_flag: usize = 0;
         let mut k_num_list: Vec<Vec<usize>> = Vec::new();
         let mut k_num_flag: usize = 0;
-        let mut k_num_max: usize = 0;
+        let mut seed_num: usize = 0;
         let mut last_k_num: Vec<usize> = Vec::new();
         let mut point_flag = false;
         let mut user_list: Vec<usize> = Vec::new();
@@ -229,11 +229,6 @@ fn kmeans(
             code_name: 0,
             num: 0,
         };
-        // if num == TASK_PUBLLISHER{
-        //     max_user = max;
-        //     k_num_list.resize(seed_num, Vec::new());
-        //     team_list.resize(max, Vec::new());
-        // }
         loop {
             if let Ok((size, _addr)) = socket_get.recv_from(&mut buf) {
                 let msg_type: MessageType =
@@ -249,7 +244,6 @@ fn kmeans(
                                 println!("發布者");
                                 max_user = max;
                                 user_list.resize(max_user,1);
-                                k_num_list.resize(seed_num, Vec::new());
                                 team_list.resize(max_user, Vec::new());
                                 let msg_type = MessageType::CodeNameMessage(user_id.code_name);
                                 send_message(&socket_send, msg_type);
@@ -310,9 +304,9 @@ fn kmeans(
                             *point = points.clone();
                             step_now = 1;
                             //隨機中心點
-                            if num == 0 {
+                            if user_id.num == 0 {
                                 let msg_type =
-                                    MessageType::ResetKNumMessage(random_center(seed_num, dot_num)); //發送初始中心點
+                                    MessageType::ResetKNumMessage(random_center(seed_num_temp, dot_num)); //發送初始中心點
                                 send_message(&socket_send, msg_type);
                             }
                         } else {
@@ -326,13 +320,13 @@ fn kmeans(
                             let mut k_num = thread_k_num.lock().unwrap();
                             *k_num = get_k_num.clone();
                             last_k_num = k_num.clone();
-                            k_num_max = k_num.len();
-                            k_num_list.resize(k_num_max, Vec::new());
+                            seed_num = k_num.len();
+                            k_num_list.resize(seed_num, Vec::new());
                             let point = thread_point.lock().unwrap();
-                            team_list[num] = cluster(&point, &k_num, num, max_user); //計算team
+                            team_list[user_id.num] = cluster(&point, &k_num, user_id.num, max_user); //計算team
                             step_now += 1;
                             let msg_type =
-                                MessageType::TeamMessage((step_now, num, team_list[num].clone())); //發送team
+                                MessageType::TeamMessage((step_now, user_id.num, team_list[user_id.num].clone())); //發送team
                             send_message(&socket_send, msg_type);
                         } else {
                             println!("無法接收k_num，需等到處理完畢");
@@ -349,22 +343,22 @@ fn kmeans(
                                 let mut team = thread_team.lock().unwrap();
                                 let point = thread_point.lock().unwrap();
                                 team.clear();
-                                for _i in 0..k_num_max {
+                                for _i in 0..seed_num {
                                     team.push(Vec::new());
                                 }
                                 for i in 0..max_user {
-                                    for j in 0..k_num_max {
+                                    for j in 0..seed_num {
                                         team[j].extend(&team_list[i][j]);
                                     }
                                 }
                                 //計算並發送k_num
-                                k_num_list[num] = re_seed(&point, &team, num, max_user);
+                                k_num_list[user_id.num] = re_seed(&point, &team, user_id.num, max_user);
                                 step_now += 1;
                                 k_num_flag = 0;
                                 let msg_type = MessageType::KNumMessage((
                                     step_now,
-                                    num,
-                                    k_num_list[num].clone(),
+                                    user_id.num,
+                                    k_num_list[user_id.num].clone(),
                                 )); //發送中心點
                                 send_message(&socket_send, msg_type);
                             }
@@ -378,7 +372,7 @@ fn kmeans(
                         if point_flag == true && get_step == step_now && k_num_flag < max_user {
                             k_num_list[get_num] = get_k_num.clone();
                             k_num_flag += 1;
-                            println!("{} {}", k_num_flag, k_num_max);
+                            println!("{} {}", k_num_flag, seed_num);
                             if k_num_flag == max_user {
                                 k_num_flag = 0;
                                 let mut k_num = thread_k_num.lock().unwrap();
@@ -395,18 +389,18 @@ fn kmeans(
                                 }
                                 last_k_num = k_num.clone();
                                 let point = thread_point.lock().unwrap();
-                                team_list[num] = cluster(&point, &k_num, num, max_user); //計算team
+                                team_list[user_id.num] = cluster(&point, &k_num, user_id.num, max_user); //計算team
                                 step_now += 1;
                                 let msg_type = MessageType::TeamMessage((
                                     step_now,
-                                    num,
-                                    team_list[num].clone(),
+                                    user_id.num,
+                                    team_list[user_id.num].clone(),
                                 ));
                                 send_message(&socket_send, msg_type);
                             }
                         } else {
                             println!("Please input point. --get_k_num");
-                            println!("{} {}", k_num_flag, k_num_max);
+                            println!("{} {}", k_num_flag, seed_num);
                         }
                     }
                 }
