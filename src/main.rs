@@ -224,7 +224,7 @@ fn kmeans(
         let mut max_user: usize = 0;
 
         let mut step_now = 0;
-        let start_time: Instant = Instant::now();
+        let mut start_time: Instant = Instant::now();
         let mut user_id: TaskUser = TaskUser {
             code_name: 0,
             num: 0,
@@ -317,6 +317,9 @@ fn kmeans(
                     //初始化k_num
                     MessageType::ResetKNumMessage(get_k_num) => {
                         println!("reset k_num step_now:{}", step_now);
+                        if user_id.num == TASK_PUBLLISHER{
+                            start_time = Instant::now();
+                        }
                         if point_flag == true {
                             let mut k_num = thread_k_num.lock().unwrap();
                             *k_num = get_k_num.clone();
@@ -386,9 +389,11 @@ fn kmeans(
                                 }
                                 println!("knum:\n{:?}", k_num);
                                 if *k_num == last_k_num {
-                                    let end_time: Instant = Instant::now();
-                                    let elapsed_time = end_time - start_time;
-                                    println!("\n{}ms", elapsed_time.as_millis());
+                                    if user_id.num == TASK_PUBLLISHER{
+                                        let end_time: Instant = Instant::now();
+                                        let elapsed_time = end_time - start_time;
+                                        println!("\n{}ms", elapsed_time.as_millis());
+                                    }
                                     break;
                                 }
                                 last_k_num = k_num.clone();
@@ -406,6 +411,9 @@ fn kmeans(
                             println!("Please input point. --get_k_num");
                             println!("{} {}", k_num_flag, seed_num);
                         }
+                    }
+                    _ => {
+                        
                     }
                 }
             }
