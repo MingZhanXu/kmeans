@@ -4,21 +4,23 @@ extern crate piston_window;
 use piston_window::*;
 
 use rand::Rng;
-use std::cmp::{Eq, PartialEq};
-use std::fmt;
+
 use std::time::Instant;
 
 use std::io;
 
 use serde::{Deserialize, Serialize};
-use std::net::UdpSocket;
 use std::thread;
 use std::time::Duration;
 
 use std::sync::{Arc, Mutex};
 
+mod kmeans_struct;
+use kmeans_struct::kmeans_struct::*;
+mod udp_transmission;
+use udp_transmission::udp_transmisson::*;
+
 const TASK_PUBLLISHER: usize = 0;
-const MAX_MESSAGE_SIZE: usize = 65507;
 fn main() {
     let num = read_number("num: ");
     match num {
@@ -38,66 +40,9 @@ fn main() {
         }
     }
 }
-#[derive(Serialize, Deserialize, Debug, Clone)]
-struct Point {
-    x: f64,
-    y: f64,
-}
-//點顯示
-impl fmt::Display for Point {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "({}, {})", self.x, self.y)
-    }
-}
-//點比較
-impl PartialEq for Point {
-    fn eq(&self, other: &Self) -> bool {
-        self.x == other.x && self.y == other.y
-    }
-}
-impl Eq for Point {}
-//計算點差距
-impl Point {
-    fn dis(&self, k_point: &Point) -> f64 {
-        ((k_point.x - self.x).powf(2.0) + (k_point.y - self.y).powf(2.0)).powf(0.5)
-    }
-}
 
-//訊息總類
-#[derive(Serialize, Deserialize, Debug)]
-enum MessageType {
-    TaskNameMessage(String, usize), //task_name, max
-    CodeNameMessage(usize),
-    NumMessage(Vec<usize>), //code_name
-    PointMessage(Vec<Point>),
-    TeamMessage((usize, usize, Vec<Vec<usize>>)), //step, num.
-    KNumMessage((usize, usize, Vec<usize>)),
-    ResetKNumMessage(Vec<usize>),
-    HandshakingMessage((String, usize)), //Port, MessageType(now_step)
-}
-#[derive(Serialize, Deserialize, Debug)]
-struct TaskUser {
-    code_name: usize,
-    num: usize,
-}
-//隨機產生不重複點
-fn generate_point(dot_num: usize) -> Vec<Point> {
-    let mut point: Vec<Point> = vec![];
-    for _ in 0..dot_num {
-        let mut p: Point;
-        loop {
-            let x = rand::thread_rng().gen_range(0.0..1024.0 as f64);
-            let y = rand::thread_rng().gen_range(0.0..1024.0 as f64);
-            p = Point { x, y };
-            if !point.contains(&p) {
-                break;
-            }
-        }
-        point.push(p);
-    }
-    println!("隨機點產生完畢");
-    point
-}
+
+
 //隨機點中心
 fn random_center(seed_num: usize, dot_num: usize) -> Vec<usize> {
     //隨機群中心
@@ -471,60 +416,4 @@ fn read_number(prompt: &str) -> usize {
         .read_line(&mut input)
         .expect("Failed to read line");
     input.trim().parse().expect("Invalid input")
-}
-//發送長訊息
-fn send_message(socket: &UdpSocket, message: MessageType) {
-    let serialized_msg = serde_json::to_string(&message).expect("Failed to serialize message");
-    let mut remaining = serialized_msg.as_bytes();
-    let mut _offset = 0;
-    while !remaining.is_empty() {
-        let chunk = &remaining[..MAX_MESSAGE_SIZE.min(remaining.len())];
-        socket.send_to(chunk, "127.0.0.1:8888").expect("Failed to send message");
-        socket.send_to(chunk, "127.0.0.1:8889").expect("Failed to send message");
-        remaining = &remaining[chunk.len()..];
-        _offset += chunk.len();
-    }
-    // println!("發送完畢");
-}
-//接收長訊息
-fn receive_message(socket: &UdpSocket) -> (Box<[u8]>, usize) {
-    let mut received_message = Vec::new();
-    let mut total_bytes = 0;
-    loop {
-        let mut buffer = [0; MAX_MESSAGE_SIZE];
-        match socket.recv(&mut buffer) {
-            Ok(received_bytes) => {
-                total_bytes += received_bytes;
-                received_message.extend_from_slice(&buffer[..received_bytes]);
-                if received_bytes < MAX_MESSAGE_SIZE {
-                    // println!("接收完畢");
-                    break;
-                }
-            }
-            Err(e) => {
-                eprintln!("Error receiving message: {}", e);
-                break;
-            }
-        }
-    }
-    (received_message.into_boxed_slice(), total_bytes)
-}
-//自動獲取Port(單機測試)
-fn get_port(start_port: i32) -> Option<UdpSocket>{
-    let mut receive_port = start_port;
-    let mut _receive_socket = None;
-    loop {
-        match UdpSocket::bind(format!("127.0.0.1:{}", receive_port)) {
-            Ok(socket) => {
-                println!("Successfully bound to port {}", receive_port);
-                _receive_socket = Some(socket);
-                break;
-            }
-            Err(_) => {
-                println!("Failed to bind to port {}, trying next port", receive_port);
-                receive_port += 1;
-            }
-        }
-    }
-    _receive_socket
 }
