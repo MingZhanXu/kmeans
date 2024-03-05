@@ -1,8 +1,7 @@
-use rand::Rng;
+pub use rand::Rng;
 use std::fmt;
 use std::cmp::{Eq, PartialEq};
 use serde::{Deserialize, Serialize};
-
 #[derive(Serialize, Deserialize, Debug)]
 pub struct TaskUser {
     pub code_name: usize,

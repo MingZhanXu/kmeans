@@ -3,22 +3,19 @@ extern crate piston_window;
 // use piston_window::math::triangle_face;
 use piston_window::*;
 
-use rand::Rng;
-
 use std::time::Instant;
 
 use std::io;
 
-use serde::{Deserialize, Serialize};
 use std::thread;
 use std::time::Duration;
 
 use std::sync::{Arc, Mutex};
 
 mod kmeans_struct;
-use kmeans_struct::kmeans_struct::*;
+use crate::kmeans_struct::*;
 mod udp_transmission;
-use udp_transmission::udp_transmisson::*;
+use crate::udp_transmission::*;
 
 const TASK_PUBLLISHER: usize = 0;
 fn main() {

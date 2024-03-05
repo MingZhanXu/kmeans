@@ -1,5 +1,6 @@
-use std::net::UdpSocket;
+pub use std::net::UdpSocket;
 const MAX_MESSAGE_SIZE: usize = 65507;
+use crate::kmeans_struct::*;
 //發送長訊息
 pub fn send_message(socket: &UdpSocket, message: MessageType) {
     let serialized_msg = serde_json::to_string(&message).expect("Failed to serialize message");
