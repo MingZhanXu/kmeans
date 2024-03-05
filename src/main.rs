@@ -68,7 +68,7 @@ impl Point {
 enum MessageType {
     TaskNameMessage(String, usize), //task_name, max
     CodeNameMessage(usize),
-    NumMessage(TaskUser, usize), //code_name, max-now
+    NumMessage(Vec<usize>), //code_name
     PointMessage(Vec<Point>),
     TeamMessage((usize, usize, Vec<Vec<usize>>)), //step, num.
     KNumMessage((usize, usize, Vec<usize>)),
@@ -195,22 +195,7 @@ fn kmeans(
     let thread_team = Arc::clone(&team);
     //啟動接收訊息
     let handle = thread::spawn(move || {
-        let mut receive_port = 8888;
-        let mut _receive_socket = None;
-        loop {
-            match UdpSocket::bind(format!("127.0.0.1:{}", receive_port)) {
-                Ok(socket) => {
-                    println!("Successfully bound to port {}", receive_port);
-                    _receive_socket = Some(socket);
-                    break;
-                }
-                Err(_) => {
-                    println!("Failed to bind to port {}, trying next port", receive_port);
-                    receive_port += 1;
-                }
-            }
-        }
-        let socket_get = _receive_socket.expect("Failed to bind socket");
+        let socket_get = get_port(8888).expect("Failed to bind socket");
         let socket_send = UdpSocket::bind("0.0.0.0:0").expect("Failed to bind socket");
         // socket_send.set_broadcast(true).expect("Failed to set broadcast"); //廣播模式
         let mut _buf = vec![0u8; 1024 * 1024].into_boxed_slice();
@@ -222,7 +207,7 @@ fn kmeans(
         let mut seed_num: usize = 0;
         let mut last_k_num: Vec<usize> = Vec::new();
         let mut point_flag = false;
-        let mut user_list: Vec<usize> = Vec::new();
+        let mut user_list: Vec<usize>;
         let mut user_list_flag: usize = 0;
         let mut max_user: usize = 0;
 
@@ -252,22 +237,18 @@ fn kmeans(
                 //接收到任務
                 MessageType::TaskNameMessage(get_task, get_max) => {
                     println!("get task:{}, max:{}", get_task, get_max);
-                    user_list = vec![0; max_user];
                     println!("num: {}", num);
+                    max_user = get_max;
+                    user_list = vec![1; max_user];
+                    team_list.resize(max_user, Vec::new());
                     match num{
                         TASK_PUBLLISHER => {
                             println!("發布者");
-                            max_user = max;
-                            user_list.resize(max_user,1);
-                            team_list.resize(max_user, Vec::new());
                             let msg_type = MessageType::CodeNameMessage(user_id.code_name);
                             send_message(&socket_send, msg_type);
                         }
                         _ => {
                             println!("接取者");
-                            max_user = get_max;
-                            user_list.resize(max_user,1);
-                            team_list.resize(max_user, Vec::new());
                             user_id.code_name = rand::thread_rng().gen_range(2..std::usize::MAX as usize);
                         }
                     }
@@ -279,46 +260,35 @@ fn kmeans(
                         //任務發布者
                         TASK_PUBLLISHER => {
                             if user_list_flag < max_user {
-                                let msg_type = MessageType::NumMessage(
-                                    TaskUser {
-                                        code_name: get_code_name,
-                                        num: user_list_flag,
-                                    },
-                                    max_user - user_list_flag - 1,
-                                );
-                                send_message(&socket_send, msg_type);
+                                if user_list_flag == 0{
+                                    user_list[TASK_PUBLLISHER] = TASK_PUBLLISHER;
+                                    user_list_flag = 1;
+                                }
+                                user_list[user_list_flag] = get_code_name;
+                                user_list_flag += 1;
+                                if user_list_flag == max_user{
+                                    let msg_type = MessageType::NumMessage(user_list);
+                                    send_message(&socket_send, msg_type);
+                                }
                             } else {
                                 println!("Warning: User capacity reached. --CodeNameMessage\n\tuser_list_flag:{}\t\tmax_user:{}", user_list_flag, max_user);
                             }
                         }
                         //其餘
                         _ => {
+                            continue;
                         }
                     }
                 }
                 //接收到使用者代號與順序
-                MessageType::NumMessage(get_task_user, get_user_t) => {
-                    println!("{:?} {:?}", get_task_user, get_user_t);
-                    if get_task_user.code_name == user_id.code_name && get_user_t < max_user {
-                        user_id.num = get_task_user.num;
-                        println!("user_id.num:{} --NumMessage", user_id.num);
-                    }
-                    user_list[get_task_user.num] = get_task_user.code_name;
-                    match num {
-                        TASK_PUBLLISHER =>{
-                            user_list_flag += 1;
-                            if user_list_flag == max_user {
-                                let msg_type =
-                                    MessageType::PointMessage(generate_point(dot_num)); //產生隨機點
-                                send_message(&socket_send, msg_type);
-                            }
-                        }
-                        _ => {
-                            if user_list_flag < max_user{
-                                let msg_type = MessageType::CodeNameMessage(user_id.code_name);
-                                send_message(&socket_send, msg_type);
-                            }
-                        }
+                MessageType::NumMessage(get_user_list) => {
+                    println!("set user_list");
+                    println!("{:?}", get_user_list);
+                    user_list = get_user_list;
+                    if num == TASK_PUBLLISHER{
+                        let msg_type =
+                            MessageType::PointMessage(generate_point(dot_num)); //產生隨機點
+                        send_message(&socket_send, msg_type);
                     }
                 }
                 //Point
@@ -551,4 +521,23 @@ fn receive_long_message(socket: &UdpSocket) -> (Box<[u8]>, usize) {
         }
     }
     (received_message.into_boxed_slice(), total_bytes)
+}
+
+fn get_port(start_port: i32) -> Option<UdpSocket>{
+    let mut receive_port = start_port;
+    let mut receive_socket = None;
+    loop {
+        match UdpSocket::bind(format!("127.0.0.1:{}", receive_port)) {
+            Ok(socket) => {
+                println!("Successfully bound to port {}", receive_port);
+                receive_socket = Some(socket);
+                break;
+            }
+            Err(_) => {
+                println!("Failed to bind to port {}, trying next port", receive_port);
+                receive_port += 1;
+            }
+        }
+    }
+    receive_socket
 }
