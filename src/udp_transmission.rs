@@ -1,15 +1,17 @@
 pub use std::net::UdpSocket;
 const MAX_MESSAGE_SIZE: usize = 65507;
-use crate::kmeans_struct::*;
+use super::*;
 //發送長訊息
-pub fn send_message(socket: &UdpSocket, message: MessageType) {
+pub fn send_message(socket: &UdpSocket, message: MessageType, ports: Vec<&str>) {
     let serialized_msg = serde_json::to_string(&message).expect("Failed to serialize message");
     let mut remaining = serialized_msg.as_bytes();
     let mut _offset = 0;
     while !remaining.is_empty() {
         let chunk = &remaining[..MAX_MESSAGE_SIZE.min(remaining.len())];
-        socket.send_to(chunk, "127.0.0.1:8888").expect("Failed to send message");
-        socket.send_to(chunk, "127.0.0.1:8889").expect("Failed to send message");
+        for port in &ports {
+            socket.send_to(chunk, port).expect("Failed to send message");
+            // println!("發送至:{}\t{:?}", port, chunk);
+        }
         remaining = &remaining[chunk.len()..];
         _offset += chunk.len();
     }

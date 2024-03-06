@@ -1,11 +1,9 @@
 extern crate piston_window;
 
 // use piston_window::math::triangle_face;
-use piston_window::*;
 
 use std::time::Instant;
 
-use std::io;
 
 use std::thread;
 use std::time::Duration;
@@ -16,7 +14,10 @@ mod kmeans_struct;
 use crate::kmeans_struct::*;
 mod udp_transmission;
 use crate::udp_transmission::*;
-
+mod kmeans;
+use crate::kmeans::*;
+mod tool;
+use crate::tool::*;
 const TASK_PUBLLISHER: usize = 0;
 fn main() {
     let num = read_number("num: ");
@@ -39,89 +40,6 @@ fn main() {
 }
 
 
-
-//隨機點中心
-fn random_center(seed_num: usize, dot_num: usize) -> Vec<usize> {
-    //隨機群中心
-    let mut k_num: Vec<usize> = vec![];
-    for _ in 0..seed_num {
-        let mut num;
-        loop {
-            num = rand::thread_rng().gen_range(0..dot_num);
-            //判斷是否包含
-            if !k_num.contains(&num) {
-                break;
-            }
-        }
-        k_num.push(num);
-    }
-    k_num
-}
-//元素分群
-fn cluster(point: &Vec<Point>, k_num: &Vec<usize>, num: usize, max: usize) -> Vec<Vec<usize>> {
-    let dot_num = point.len();
-    let mut dot_range = dot_num / max;
-    let start = dot_range * num;
-    if num == max - 1 {
-        dot_range = dot_num - start;
-    }
-    let seed_num = k_num.len();
-    let mut team: Vec<Vec<usize>> = vec![vec![]; seed_num];
-    for i in start..start + dot_range {
-        let mut mid_dis = f64::MAX;
-        let mut flag: usize = 0;
-        for j in 0..seed_num {
-            let distant = point[i].dis(&point[k_num[j]]);
-            if distant < mid_dis {
-                mid_dis = distant;
-                flag = j;
-            }
-        }
-        team[flag].push(i);
-    }
-    team
-}
-//找新中心
-//team[編號]
-fn re_seed(point: &Vec<Point>, team: &Vec<Vec<usize>>, num: usize, max: usize) -> Vec<usize> {
-    let seed_num = team.len();
-    //缺少錯誤處裡seed_num < max
-    let mut seed_rang = seed_num / max;
-    let start = seed_rang * num;
-    if num == max - 1 {
-        seed_rang = seed_num - start;
-    }
-    let mut k_num: Vec<usize> = vec![];
-    let mut cluster: &Vec<usize>;
-    for _i in start..start + seed_rang {
-        cluster = &team[_i];
-        if !cluster.is_empty() {
-            let mut sum_x = 0.0;
-            let mut sum_y = 0.0;
-            for &index in cluster {
-                sum_x += point[index].x;
-                sum_y += point[index].y;
-            }
-            let new_center_x = sum_x / cluster.len() as f64;
-            let new_center_y = sum_y / cluster.len() as f64;
-            let new_center_point = Point {
-                x: new_center_x,
-                y: new_center_y,
-            };
-            let mut min_distance = f64::MAX;
-            let mut new_center_index = 0;
-            for (_j, &index) in cluster.iter().enumerate() {
-                let distance = point[index].dis(&new_center_point);
-                if distance < min_distance {
-                    min_distance = distance;
-                    new_center_index = index;
-                }
-            }
-            k_num.push(new_center_index);
-        }
-    }
-    k_num
-}
 //執行kmeans
 fn kmeans(
     seed_num_temp: usize,
@@ -153,7 +71,7 @@ fn kmeans(
         let mut user_list: Vec<usize> = Vec::new();
         let mut user_list_flag: usize = 0;
         let mut max_user: usize = 0;
-        
+        let mut ports = vec!["127.0.0.1:8888", "127.0.0.1:8889", "127.0.0.1:9000"];
         let mut step_now = 0;
         let mut start_time: Instant = Instant::now();
         let mut user_id: TaskUser = TaskUser {
@@ -184,7 +102,7 @@ fn kmeans(
                         }
                     }
                     let msg_type = MessageType::CodeNameMessage(user_id.code_name);
-                    send_message(&socket_send, msg_type);
+                    send_message(&socket_send, msg_type, ports.clone());
                 }
                 //接收到使用者代號
                 MessageType::CodeNameMessage(get_code_name) => {
@@ -198,11 +116,11 @@ fn kmeans(
                                 println!("user_list_flag:{} max_user:{}",user_list_flag ,max_user);
                                 if user_list_flag == max_user{
                                     let msg_type = MessageType::NumMessage(user_list.clone());
-                                    send_message(&socket_send, msg_type);
+                                    send_message(&socket_send, msg_type, ports.clone());
                                     thread::sleep(Duration::from_secs(1));
                                     let msg_type =
                                         MessageType::PointMessage(generate_point(dot_num)); //產生隨機點
-                                    send_message(&socket_send, msg_type);
+                                    send_message(&socket_send, msg_type, ports.clone());
                                 }
                             } else {
                                 println!("Warning: User capacity reached. --CodeNameMessage\n\tuser_list_flag:{}\t\tmax_user:{}", user_list_flag, max_user);
@@ -235,7 +153,7 @@ fn kmeans(
                             *k_num = random_center(seed_num_temp, dot_num);
                             let msg_type =
                                 MessageType::ResetKNumMessage(k_num.clone()); //發送初始中心點
-                            send_message(&socket_send, msg_type);
+                            send_message(&socket_send, msg_type, ports.clone());
                         }
                     } else {
                         println!("無法接收point，需等到處理完畢");
@@ -260,7 +178,7 @@ fn kmeans(
                         let msg_type =
                             MessageType::TeamMessage((step_now, user_id.num, team_list[user_id.num].clone())); //發送team
                         println!("-------add step; step_now:{}\nmsg_type:{:?}", step_now, msg_type);
-                        send_message(&socket_send, msg_type);
+                        send_message(&socket_send, msg_type, ports.clone());
                     } else {
                         println!("無法接收k_num，需等到處理完畢");
                     }
@@ -303,7 +221,7 @@ fn kmeans(
                                 user_id.num,
                                 k_num_list[user_id.num].clone(),
                             )); //發送中心點
-                            send_message(&socket_send, msg_type);
+                            send_message(&socket_send, msg_type, ports.clone());
                         }
                     } else {
                         println!("Please input point. --get_team");
@@ -341,7 +259,7 @@ fn kmeans(
                                 user_id.num,
                                 team_list[user_id.num].clone(),
                             ));
-                            send_message(&socket_send, msg_type);
+                            send_message(&socket_send, msg_type, ports.clone());
                         }
                     } else {
                         println!("Please input point. --get_k_num");
@@ -361,7 +279,8 @@ fn kmeans(
         let socket = UdpSocket::bind("0.0.0.0:0").expect("Failed to bind socket");
         let task = rand::thread_rng().gen_range(0..std::usize::MAX as usize);
         let msg_type = MessageType::TaskNameMessage(task.to_string(), max); //產生隨機點
-        send_message(&socket, msg_type);
+        let mut ports = vec!["127.0.0.1:8888", "127.0.0.1:8889", "127.0.0.1:9000"];
+        send_message(&socket, msg_type, ports.clone());
         thread::sleep(Duration::from_secs(1));
     }
 
@@ -371,46 +290,4 @@ fn kmeans(
     let k_nums = k_num.lock().unwrap();
     // println!("Final result: {:?}", *out_point);
     (k_nums.clone(), teams.clone(), out_point.clone())
-}
-//繪製視窗
-fn draw_window(point: &Vec<Point>, team: &Vec<Vec<usize>>, k_num: &Vec<usize>) {
-    println!("draw:\nteam:{:?}\nk_num:{:?}", team, k_num);
-    //繪圖
-    let mut window: PistonWindow = WindowSettings::new("kmean", [1024, 1024])
-        .exit_on_esc(true)
-        .build()
-        .unwrap();
-    while let Some(event) = window.next() {
-        window.draw_2d(&event, |c, g, _| {
-            clear([1.0; 4], g);
-            for i in 0..k_num.len() {
-                let line_color = [0.0, 0.0, 0.0, 1.0];
-                for j in &team[i] {
-                    print!("{} ", *j);
-                    line(
-                        line_color,
-                        1.0,
-                        [
-                            point[*j].x,
-                            point[*j].y,
-                            point[k_num[i]].x,
-                            point[k_num[i]].y,
-                        ],
-                        c.transform,
-                        g,
-                    );
-                }
-                println!();
-            }
-        });
-    }
-}
-//顯示、讀取鍵盤輸入資料
-fn read_number(prompt: &str) -> usize {
-    println!("{}", prompt);
-    let mut input = String::new();
-    io::stdin()
-        .read_line(&mut input)
-        .expect("Failed to read line");
-    input.trim().parse().expect("Invalid input")
 }
