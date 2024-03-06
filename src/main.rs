@@ -137,6 +137,12 @@ fn kmeans(
                     println!("set user_list");
                     println!("{:?}", get_user_list);
                     user_list = get_user_list;
+                    for (num, &data) in user_list.iter().enumerate(){
+                        if data == user_id.code_name{
+                            user_id.num = num;
+                            println!("編號為: {}", user_id.num);
+                        }
+                    }
                 }
                 //Point
                 MessageType::PointMessage(points) => {
@@ -202,7 +208,7 @@ fn kmeans(
                             for _i in 0..seed_num {
                                 team.push(Vec::new());
                             }
-                            println!("team_list:{:?}", team_list);
+                            // println!("team_list:{:?}", team_list);
                             for i in 0..max_user {
                                 println!("team_list[{}].len():{}", i, team_list[i].len());
                                 for j in 0..seed_num {
