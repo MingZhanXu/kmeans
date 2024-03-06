@@ -71,7 +71,7 @@ fn kmeans(
         let mut user_list: Vec<usize> = Vec::new();
         let mut user_list_flag: usize = 0;
         let mut max_user: usize = 0;
-        let ports = vec!["127.0.0.1:8888", "127.0.0.1:8889", "127.0.0.1:8890", "127.0.0.1:8891", "127.0.0.1:8892", "127.0.0.1:8893"];
+        let ports = vec!["127.0.0.1:8888", "127.0.0.1:8889", "127.0.0.1:8890"];
         let mut step_now = 0;
         let mut start_time: Instant = Instant::now();
         let mut user_id: TaskUser = TaskUser {
@@ -140,7 +140,7 @@ fn kmeans(
                     for (num, &data) in user_list.iter().enumerate(){
                         if data == user_id.code_name{
                             user_id.num = num;
-                            println!("編號為: {} user_list: {:?}", user_id.num, user_list);
+                            println!("編號為: {}", user_id.num);
                         }
                     }
                 }
@@ -157,7 +157,6 @@ fn kmeans(
                             println!("發送初始中心點");
                             let mut k_num = thread_k_num.lock().unwrap();
                             *k_num = random_center(seed_num_temp, dot_num);
-                            println!("------seed_num_temp:{} k_num.len(){}", seed_num_temp, k_num.len());
                             let msg_type =
                                 MessageType::ResetKNumMessage(k_num.clone()); //發送初始中心點
                             send_message(&socket_send, msg_type, ports.clone());
@@ -220,8 +219,8 @@ fn kmeans(
                             }
                             // println!("team:\n{:?}", team);
                             //計算並發送k_num
+                            // println!("{} {}",k_num_list.len(), user_id.num);
                             k_num_list.resize(seed_num, Vec::new());
-                            println!("{} {} {}",k_num_list.len(), user_id.num, seed_num);
                             k_num_list[user_id.num] = re_seed(&point, &team, user_id.num, max_user);
                             step_now += 1;
                             k_num_flag = 0;
@@ -288,7 +287,7 @@ fn kmeans(
         let socket = UdpSocket::bind("0.0.0.0:0").expect("Failed to bind socket");
         let task = rand::thread_rng().gen_range(0..std::usize::MAX as usize);
         let msg_type = MessageType::TaskNameMessage(task.to_string(), max); //產生隨機點
-        let ports = vec!["127.0.0.1:8888", "127.0.0.1:8889", "127.0.0.1:8890", "127.0.0.1:8891", "127.0.0.1:8892", "127.0.0.1:8893"];
+        let ports = vec!["127.0.0.1:8888", "127.0.0.1:8889", "127.0.0.1:8890"];
         send_message(&socket, msg_type, ports.clone());
         thread::sleep(Duration::from_secs(1));
     }

@@ -21,8 +21,8 @@ pub fn send_message(socket: &UdpSocket, message: MessageType, ports: Vec<&str>) 
 pub fn receive_message(socket: &UdpSocket) -> (Box<[u8]>, usize) {
     let mut received_message = Vec::new();
     let mut total_bytes = 0;
+    let mut buffer = [0; MAX_MESSAGE_SIZE];
     loop {
-        let mut buffer = [0; MAX_MESSAGE_SIZE];
         match socket.recv(&mut buffer) {
             Ok(received_bytes) => {
                 total_bytes += received_bytes;
