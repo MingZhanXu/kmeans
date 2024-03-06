@@ -16,7 +16,7 @@ pub fn draw_window(point: &Vec<Point>, team: &Vec<Vec<usize>>, k_num: &Vec<usize
             for i in 0..k_num.len() {
                 let line_color = [0.0, 0.0, 0.0, 1.0];
                 for j in &team[i] {
-                    print!("{} ", *j);
+                    // print!("{} ", *j);
                     line(
                         line_color,
                         1.0,
@@ -30,7 +30,7 @@ pub fn draw_window(point: &Vec<Point>, team: &Vec<Vec<usize>>, k_num: &Vec<usize
                         g,
                     );
                 }
-                println!();
+                // println!();
             }
         });
     }
