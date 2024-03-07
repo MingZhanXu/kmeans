@@ -43,17 +43,19 @@ pub fn cluster(point: &Vec<Point>, k_num: &Vec<usize>, num: usize, max: usize) -
 ///
 /// # 變數說明
 ///
-/// * `point`: 一個包含所有點的向量。
-/// * `team`: 一個包含所有群的向量，每個群都包含多個中心點的向量。
-/// * `num`: 編號。
-/// * `max`: 運算人數。
+/// * `point`: point\[座標編號\]。
+/// * `team`: team\[使用者編號\]\[中心點順序\]。
+/// * `num`: 使用者編號。
+/// * `max`: 總運算人數。
 ///
 /// # 使用範例
 ///
 /// ```
+/// use kmeans::kmeans_struct::Point;
+/// use kmeans::kmeans::re_seed;
 /// let point = vec![Point { x: 1.0, y: 2.0 }, Point { x: 3.0, y: 4.0 }, Point { x: 5.0, y: 6.0 }, Point { x: 8.0, y: 8.0}];
 /// let team = vec![vec![0, 1, 2], vec![3]];
-/// let num = 1;
+/// let num = 0;
 /// let max = 1;
 /// let result = re_seed(&point, &team, num, max);
 /// assert_eq!(result, vec![1, 3]);
