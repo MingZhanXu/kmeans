@@ -1,7 +1,6 @@
 use crate::kmeans_struct::*;
-//隨機點中心
+/// 產生隨機中心點
 pub fn random_center(seed_num: usize, dot_num: usize) -> Vec<usize> {
-    //隨機群中心
     let mut k_num: Vec<usize> = vec![];
     for _ in 0..seed_num {
         let mut num;
@@ -16,7 +15,7 @@ pub fn random_center(seed_num: usize, dot_num: usize) -> Vec<usize> {
     }
     k_num
 }
-//元素分群
+/// 將點位分群
 pub fn cluster(point: &Vec<Point>, k_num: &Vec<usize>, num: usize, max: usize) -> Vec<Vec<usize>> {
     let dot_num = point.len();
     let mut dot_range = dot_num / max;
@@ -40,8 +39,26 @@ pub fn cluster(point: &Vec<Point>, k_num: &Vec<usize>, num: usize, max: usize) -
     }
     team
 }
-//找新中心
-//team[編號]
+/// 尋找新的群中心
+///
+/// # 變數說明
+///
+/// * `point`: 一個包含所有點的向量。
+/// * `team`: 一個包含所有群的向量，每個群都包含多個中心點的向量。
+/// * `num`: 編號。
+/// * `max`: 運算人數。
+///
+/// # 使用範例
+///
+/// ```
+/// let point = vec![Point { x: 1.0, y: 2.0 }, Point { x: 3.0, y: 4.0 }, Point { x: 5.0, y: 6.0 }, Point { x: 8.0, y: 8.0}];
+/// let team = vec![vec![0, 1, 2], vec![3]];
+/// let num = 1;
+/// let max = 1;
+/// let result = re_seed(&point, &team, num, max);
+/// assert_eq!(result, vec![1, 3]);
+/// ```
+///
 pub fn re_seed(point: &Vec<Point>, team: &Vec<Vec<usize>>, num: usize, max: usize) -> Vec<usize> {
     let seed_num = team.len();
     //缺少錯誤處裡seed_num < max
