@@ -11,6 +11,7 @@ use std::time::Duration;
 use std::sync::{Arc, Mutex};
 
 mod kmeans_struct;
+pub mod ledger_struct;
 use crate::kmeans_struct::*;
 mod udp_transmission;
 use crate::udp_transmission::*;

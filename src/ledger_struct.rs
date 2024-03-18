@@ -8,6 +8,7 @@ pub struct UserIPAddr{
     pub user: String,
     pub ip_addr: String,
 }
+
 /// 使用者
 /// 
 /// # 變數說明
@@ -28,11 +29,6 @@ pub struct User{
     pub subusers: Option<Vec<User>>,
     pub subusers_permissions: u32,
 }
-// pub struct AreaLedger{
-//     pub name: String,
-//     pub log: String,
-// }
-// pub struct 
 
 /// 標頭結構
 /// 
@@ -72,8 +68,16 @@ pub struct Header{
 /// 
 /// *`header`: 標頭
 /// *`data`: 資料
-const MAX_DATA_SIZE: u32 = 32;
+/// 
+/// *`MAX_DATA_SIZE`: 最大資料長度
+const MAX_DATA_SIZE: usize = 32;
 pub struct Ledger{
     pub header: Header,
     pub data: [u8; MAX_DATA_SIZE],
 }
+
+// pub struct AreaLedger{
+//     pub name: String,
+//     pub log: String,
+// }
+// pub struct 
